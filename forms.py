@@ -29,13 +29,48 @@ class VeiculoForm(FlaskForm):
     marca = StringField('Marca', validators=[DataRequired("A marca é obrigatória."), Length(max=50, message="A marca deve ter no máximo 50 caracteres.")])
     modelo = StringField('Modelo', validators=[DataRequired("O modelo é obrigatório."), Length(max=50, message="O modelo deve ter no máximo 50 caracteres.")])
     ano = IntegerField('Ano (opcional)', validators=[Optional(), NumberRange(min=1900, max=datetime.now().year + 1, message="Ano inválido.")])
+
+    quilometragem = IntegerField(
+        'Quilometragem',
+        validators=[Optional(), NumberRange(min=0, message="Quilometragem inválida.")],
+    )
+
+    tipo_propagacao = SelectField(
+        'Tipo de Propulsão (BYD)',
+        validators=[DataRequired("Selecione o tipo de propulsão.")],
+        # Inclui opção vazia para que o placeholder funcione corretamente.
+        choices=[
+            ('', 'Selecione...'),
+            ('Híbrido', 'Híbrido'),
+            ('100% Elétrico', '100% Elétrico'),
+        ],
+        default='',
+    )
+
     submit = SubmitField('Salvar Veículo')
+
 
 class ServicoForm(FlaskForm):
     descricao = TextAreaField('Descrição do Serviço', validators=[DataRequired("A descrição é obrigatória.")])
-    data = DateField('Data', validators=[DataRequired("A data é obrigatória.")], format='%Y-%m-%d')
+    data = DateField('Data', validators=[DataRequired("A data é obrigatória." )], format='%Y-%m-%d')
     valor = DecimalField('Valor (R$)', validators=[DataRequired("O valor é obrigatório."), NumberRange(min=0.01, message="O valor deve ser maior que zero.")])
+
+    status = SelectField(
+        'Status',
+        choices=[('Pendente', 'Pendente'), ('Em Andamento', 'Em Andamento'), ('Concluído', 'Concluído')],
+        validators=[DataRequired()],
+    )
+
+    pago = SelectField(
+        'Pago',
+        choices=[('false', 'Não'), ('true', 'Sim')],
+        validators=[DataRequired()],
+    )
+
+    mecanico_id = SelectField('Mecânico', coerce=int, validators=[Optional()])
+
     submit = SubmitField('Salvar Serviço')
+
 
 class PecaForm(FlaskForm):
     nome = StringField('Nome da Peça', validators=[DataRequired("O nome da peça é obrigatório."), Length(max=100, message="O nome deve ter no máximo 100 caracteres.")])

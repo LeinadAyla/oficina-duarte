@@ -220,3 +220,9 @@
 
 # 2026-07-16 20:22:11.810682
 +Crie ou atualize o template templates/clientes.html para garantir que todos os modais de novo cliente, veículo e serviço estejam funcionando com o Bootstrap.
+
+# 2026-07-16 21:17:59.754111
++/add templates/clientes.html
+
+# 2026-07-16 21:18:47.896551
++Adicione um script simples com Vanilla JavaScript no final de templates/clientes.html para aplicar máscaras de formatação automática nos campos de entrada de CPF (formato 000.000.000-00) e Celular (formato (00) 00000-0000) nos modais de criação e edição.

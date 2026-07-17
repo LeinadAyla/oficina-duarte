@@ -28,6 +28,13 @@ def inject_now():
 from routes import *
 
 if __name__ == '__main__':
-    # Não precisamos mais de db.create_all() aqui se estivermos usando migrações.
-    # As migrações criarão/atualizarão o esquema do banco de dados.
+    # Garante que os modelos foram registrados e recria o banco corretamente.
+    # Mantém tudo dentro do app context para evitar "Working outside of application context".
+    with app.app_context():
+        # Importa os modelos para que todas as tabelas existam no metadata do SQLAlchemy.
+        # (Isso evita erros como "no such table: clientes").
+        from models import Cliente, Veiculo, Servico, Peca, ServicoPeca, Mecanico  # noqa: F401
+
+        db.create_all()
+
     app.run(debug=True)

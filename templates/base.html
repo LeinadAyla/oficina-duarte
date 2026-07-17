@@ -120,7 +120,10 @@
                 <a href="{{ url_for('pecas') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'pecas' %}active{% endif %}">
                     <i class="fas fa-fw fa-box me-2"></i> Estoque de Peças
                 </a>
-                {# Futuras rotas podem ser adicionadas aqui #}
+                <a href="{{ url_for('mecanicos') }}" class="list-group-item list-group-item-action {% if request.endpoint == 'mecanicos' %}active{% endif %}">
+                    <i class="fas fa-fw fa-tools me-2"></i> Mecânicos
+                </a>
+
             </div>
         </div>
         <!-- /#sidebar-wrapper -->

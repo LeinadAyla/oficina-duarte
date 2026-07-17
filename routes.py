@@ -116,8 +116,15 @@ def get_servico(servico_id):
         'data': servico.data.strftime('%Y-%m-%d') if servico.data else '',
         'valor': str(servico.valor),
         'veiculo_id': servico.veiculo_id,
+
+        # Campos necessários para o modal de edição
+        'status': servico.status,
+        'pago': bool(servico.pago),
+        'mecanico_id': servico.mecanico_id,
+
         'pecas': pecas_do_servico
     })
+
 
 @app.route('/api/peca/<int:peca_id>', methods=['GET'])
 def get_peca(peca_id):
@@ -211,14 +218,27 @@ def excluir_cliente(cliente_id):
 @app.route('/veiculo/novo/<int:cliente_id>', methods=['POST'])
 def novo_veiculo(cliente_id):
     form = VeiculoForm()
+
+    # Mantém as choices no POST (garante consistência da validação)
+    if not form.tipo_propagacao.choices:
+        form.tipo_propagacao.choices = [
+            ('', 'Selecione...'),
+            ('Híbrido', 'Híbrido'),
+            ('100% Elétrico', '100% Elétrico'),
+        ]
+
     if form.validate_on_submit():
         novo = Veiculo(
             placa=form.placa.data,
             marca=form.marca.data,
             modelo=form.modelo.data,
             ano=form.ano.data,
+            quilometragem=form.quilometragem.data,
+            tipo_propulsao=form.tipo_propagacao.data,
             cliente_id=cliente_id
         )
+
+
         try:
             db.session.add(novo)
             db.session.commit()
@@ -242,6 +262,7 @@ def editar_veiculo(veiculo_id):
         form.populate_obj(veiculo)
         try:
             db.session.commit()
+
             flash('Veículo atualizado com sucesso!', 'success')
         except Exception as e:
             db.session.rollback()
@@ -270,13 +291,25 @@ def excluir_veiculo(veiculo_id):
 @app.route('/servico/novo/<int:veiculo_id>', methods=['POST'])
 def novo_servico(veiculo_id):
     form = ServicoForm()
+    # Populate mecânicos para Select
+    form.mecanico_id.choices = [(-1, 'Nenhum mecânico')] + [
+        (m.id, f"{m.nome} ({m.especialidade}) - {m.comissao_percentual}%") for m in Mecanico.query.order_by(Mecanico.nome).all()
+    ]
+
     if form.validate_on_submit():
+        pago_bool = True if form.pago.data == 'true' else False
+        mecanico_id = None if form.mecanico_id.data in (None, -1) else form.mecanico_id.data
+
         novo = Servico(
             descricao=form.descricao.data,
             data=form.data.data,
             valor=form.valor.data,
+            status=form.status.data,
+            pago=pago_bool,
+            mecanico_id=mecanico_id,
             veiculo_id=veiculo_id
         )
+
         try:
             db.session.add(novo)
             db.session.commit()
@@ -296,8 +329,29 @@ def novo_servico(veiculo_id):
 def editar_servico(servico_id):
     servico = Servico.query.get_or_404(servico_id)
     form = ServicoForm(obj=servico)
+    # Populate mecânicos para Select
+    form.mecanico_id.choices = [(-1, 'Nenhum mecânico')] + [
+        (m.id, f"{m.nome} ({m.especialidade}) - {m.comissao_percentual}%") for m in Mecanico.query.order_by(Mecanico.nome).all()
+    ]
+
+    # Ajuste dos campos Select (wtforms não popula SelectField bool automaticamente)
+    form.status.data = servico.status
+    form.pago.data = 'true' if servico.pago else 'false'
+    if servico.mecanico_id is None:
+        form.mecanico_id.data = -1
+
     if form.validate_on_submit():
-        form.populate_obj(servico)
+        pago_bool = True if form.pago.data == 'true' else False
+        mecanico_id = None if form.mecanico_id.data in (None, -1) else form.mecanico_id.data
+
+        # Atualiza campos comuns do model
+        servico.descricao = form.descricao.data
+        servico.data = form.data.data
+        servico.valor = form.valor.data
+        servico.status = form.status.data
+        servico.pago = pago_bool
+        servico.mecanico_id = mecanico_id
+
 
         # Detecta transição para concluído/pago para aplicar bônus (Parte D)
         antes_concluido_ou_pago = (servico.status == 'Concluído') or (servico.pago is True)
@@ -414,10 +468,99 @@ def excluir_peca(peca_id):
     return redirect(url_for('pecas'))
 
 # ==========================================
+#               ROTAS DE MECÂNICOS
+# ==========================================
+
+@app.route('/mecanicos')
+def mecanicos():
+    mecanicos_list = Mecanico.query.order_by(Mecanico.nome).all()
+    return render_template('mecanicos.html', mecanicos=mecanicos_list)
+
+
+@app.route('/mecanicos/novo', methods=['POST'])
+def novo_mecanico():
+    nome = request.form.get('nome', '').strip()
+    telefone = request.form.get('telefone', '').strip() or None
+    especialidade = request.form.get('especialidade', '').strip() or None
+    comissao_percentual_raw = request.form.get('comissao_percentual', '0').strip()
+
+    try:
+        comissao_percentual = float(comissao_percentual_raw)
+    except ValueError:
+        flash('Percentual de comissão inválido.', 'danger')
+        return redirect(url_for('mecanicos'))
+
+    novo = Mecanico(
+        nome=nome,
+        telefone=telefone,
+        especialidade=especialidade,
+        comissao_percentual=comissao_percentual,
+    )
+
+    try:
+        db.session.add(novo)
+        db.session.commit()
+        flash('Mecânico cadastrado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao cadastrar mecânico: {str(e)}', 'danger')
+
+    return redirect(url_for('mecanicos'))
+
+
+@app.route('/mecanicos/editar/<int:mecanico_id>', methods=['POST'])
+def editar_mecanico(mecanico_id):
+    mecanico = Mecanico.query.get_or_404(mecanico_id)
+
+    mecanico.nome = request.form.get('nome', '').strip()
+    mecanico.telefone = request.form.get('telefone', '').strip() or None
+    mecanico.especialidade = request.form.get('especialidade', '').strip() or None
+
+    comissao_percentual_raw = request.form.get('comissao_percentual', '0').strip()
+    try:
+        mecanico.comissao_percentual = float(comissao_percentual_raw)
+    except ValueError:
+        flash('Percentual de comissão inválido.', 'danger')
+        return redirect(url_for('mecanicos'))
+
+    try:
+        db.session.add(mecanico)
+        db.session.commit()
+        flash('Mecânico atualizado com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao atualizar mecânico: {str(e)}', 'danger')
+
+    return redirect(url_for('mecanicos'))
+
+
+@app.route('/mecanicos/excluir/<int:mecanico_id>', methods=['POST'])
+def excluir_mecanico(mecanico_id):
+    mecanico = Mecanico.query.get_or_404(mecanico_id)
+    try:
+        db.session.delete(mecanico)
+        db.session.commit()
+        flash('Mecânico excluído com sucesso!', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao excluir mecânico: {str(e)}', 'danger')
+    return redirect(url_for('mecanicos'))
+
+# ==========================================
 #          AÇÕES DE PEÇAS EM SERVIÇOS
 # ==========================================
 
+
+
+@app.route('/veiculo/<int:veiculo_id>/servicos')
+def ver_servicos_do_veiculo(veiculo_id):
+    veiculo = Veiculo.query.get_or_404(veiculo_id)
+    # relacionamento já traz servicos do veículo via backref
+    return render_template('servicos.html', veiculo=veiculo, servicos=veiculo.servicos)
+
+
 @app.route('/servico/<int:servico_id>/peca/adicionar', methods=['POST'])
+
 def adicionar_peca_ao_servico(servico_id):
     servico = Servico.query.get_or_404(servico_id)
     form = AdicionarPecaServicoForm()

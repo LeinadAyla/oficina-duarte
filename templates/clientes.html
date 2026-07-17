@@ -183,6 +183,11 @@
                         <label class="form-label">{{ veiculo_form.ano.label }}</label>
                         {{ veiculo_form.ano(class="form-control", placeholder="Ex: 2020") }}
                     </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ veiculo_form.tipo_propagacao.label }}</label>
+                        {{ veiculo_form.tipo_propagacao(class="form-select") }}
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -294,9 +299,8 @@ function prepararNovoVeiculo(clienteId, clienteNome) {
 
 // Direcionamento ou controle para abrir o Gerenciamento de Serviços de um Veículo
 function abrirGerenciadorServicos(veiculoId, placa) {
-    // Redireciona ou engaja o modal de histórico de serviços baseado na sua arquitetura
-    // Exemplo: window.location.href = `/veiculo/${veiculoId}/servicos`;
-    console.log(`Abrindo serviços para o veículo: ID ${veiculoId} (Placa ${placa})`);
+    // Navega para a tela dedicada de Serviços (OS) do veículo
+    window.location.href = `/veiculo/${veiculoId}/servicos`;
 }
 </script>
 {% endblock %}

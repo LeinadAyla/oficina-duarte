@@ -36,21 +36,29 @@ class Cliente(db.Model):
 
 class Veiculo(db.Model):
     __tablename__ = 'veiculos'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     placa = db.Column(db.String(10), unique=True, nullable=False)
     marca = db.Column(db.String(50), nullable=False)
     modelo = db.Column(db.String(50), nullable=False)
     ano = db.Column(db.Integer, nullable=True)
-    
+
+    # Tipo de propulsão do veículo (usado no cadastro via VeiculoForm)
+    # IMPORTANT: nome do campo deve estar alinhado com routes.py e forms.py
+    tipo_propulsao = db.Column(db.String(50), nullable=False)
+
+    # Quilometragem atual do veículo (usada no cadastro via VeiculoForm)
+    quilometragem = db.Column(db.Integer, nullable=True)
+
     # Chave Estrangeira ligando ao Cliente
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
-    
+
     # Relacionamento: Um veículo pode ter vários serviços/ordens de serviço
     servicos = db.relationship('Servico', backref='veiculo', lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
         return f'<Veiculo {self.placa} - {self.modelo}>'
+
 
 # Modelo de Associação para a relação muitos-para-muitos entre Servico e Peca
 class ServicoPeca(db.Model):
