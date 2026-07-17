@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Estoque de Peças - Oficina Duarte{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Estoque de Peças</h1>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#pecaModal" data-action="new">
+        <i class="fas fa-plus me-1"></i> Nova Peça
+    </button>
+</div>
+
+{% if pecas %}
+<div class="table-responsive">
+    <table class="table table-hover table-striped shadow-sm rounded overflow-hidden">
+        <thead class="table-dark">
+            <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Descrição</th>
+                <th>Custo</th>
+                <th>Venda</th>
+                <th>Estoque</th>
+                <th>Alerta Mínimo</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for peca in pecas %}
+            <tr>
+                <td>{{ peca.id }}</td>
+                <td>{{ peca.nome }}</td>
+                <td>{{ peca.descricao if peca.descricao else '-' }}</td>
+                <td>R$ {{ "%.2f"|format(peca.preco_custo) }}</td>
+                <td>R$ {{ "%.2f"|format(peca.preco_venda) }}</td>
+                <td class="{% if peca.quantidade_estoque <= peca.alerta_estoque_minimo %}table-danger{% endif %}">{{ peca.quantidade_estoque }}</td>
+                <td>{{ peca.alerta_estoque_minimo }}</td>
+                <td>
+                    {% if peca.quantidade_estoque <= peca.alerta_estoque_minimo %}
+                        <span class="badge bg-danger"><i class="fas fa-exclamation-triangle"></i> Baixo</span>
+                    {% else %}
+                        <span class="badge bg-success">Ok</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-info me-2" data-bs-toggle="modal" data-bs-target="#pecaModal" data-action="edit" data-id="{{ peca.id }}">
+                        Editar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-id="{{ peca.id }}" data-type="peca" data-nome="{{ peca.nome }}">
+                        Excluir
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info text-center" role="alert">
+    Nenhuma peça cadastrada ainda. Clique em "Nova Peça" para adicionar itens ao estoque.
+</div>
+{% endif %}
+
+<!-- Modal Peça (Cadastro e Edição) -->
+<div class="modal fade" id="pecaModal" tabindex="-1" aria-labelledby="pecaModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('nova_peca') }}" id="pecaForm">
+                <input type="hidden" name="id" id="peca_id_field">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="pecaModalLabel">Nova Peça</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        {{ peca_form.nome.label(class="form-label") }}
+                        {{ peca_form.nome(class="form-control") }}
+                        {% if peca_form.nome.errors %}<div class="text-danger">{% for error in peca_form.nome.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                    </div>
+                    <div class="mb-3">
+                        {{ peca_form.descricao.label(class="form-label") }}
+                        {{ peca_form.descricao(class="form-control", rows="3") }}
+                        {% if peca_form.descricao.errors %}<div class="text-danger">{% for error in peca_form.descricao.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ peca_form.preco_custo.label(class="form-label") }}
+                            {{ peca_form.preco_custo(class="form-control", type="number", step="0.01") }}
+                            {% if peca_form.preco_custo.errors %}<div class="text-danger">{% for error in peca_form.preco_custo.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ peca_form.preco_venda.label(class="form-label") }}
+                            {{ peca_form.preco_venda(class="form-control", type="number", step="0.01") }}
+                            {% if peca_form.preco_venda.errors %}<div class="text-danger">{% for error in peca_form.preco_venda.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ peca_form.quantidade_estoque.label(class="form-label") }}
+                            {{ peca_form.quantidade_estoque(class="form-control", type="number") }}
+                            {% if peca_form.quantidade_estoque.errors %}<div class="text-danger">{% for error in peca_form.quantidade_estoque.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ peca_form.alerta_estoque_minimo.label(class="form-label") }}
+                            {{ peca_form.alerta_estoque_minimo(class="form-control", type="number") }}
+                            {% if peca_form.alerta_estoque_minimo.errors %}<div class="text-danger">{% for error in peca_form.alerta_estoque_minimo.errors %}<span>{{ error }}</span>{% endfor %}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    {{ peca_form.submit(class="btn btn-primary") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var pecaModal = document.getElementById('pecaModal');
+        pecaModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var action = button.getAttribute('data-action');
+            var modalTitle = pecaModal.querySelector('.modal-title');
+            var form = pecaModal.querySelector('form');
+            var pecaIdField = document.getElementById('peca_id_field');
+
+            form.reset(); // Limpa o formulário
+            // Limpa quaisquer classes de validação ou mensagens de erro
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            form.querySelectorAll('.text-danger').forEach(el => el.remove());
+
+            if (action === 'new') {
+                modalTitle.textContent = 'Nova Peça';
+                form.action = "{{ url_for('nova_peca') }}";
+                pecaIdField.value = '';
+            } else if (action === 'edit') {
+                modalTitle.textContent = 'Editar Peça';
+                var peca_id = button.getAttribute('data-id');
+                form.action = "{{ url_for('editar_peca', peca_id=0) }}".replace('0', peca_id);
+                pecaIdField.value = peca_id;
+
+                // Carregar dados da peça via API
+                fetch(`/api/peca/${peca_id}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        pecaModal.querySelector('#nome').value = data.nome;
+                        pecaModal.querySelector('#descricao').value = data.descricao;
+                        pecaModal.querySelector('#preco_custo').value = parseFloat(data.preco_custo).toFixed(2);
+                        pecaModal.querySelector('#preco_venda').value = parseFloat(data.preco_venda).toFixed(2);
+                        pecaModal.querySelector('#quantidade_estoque').value = data.quantidade_estoque;
+                        pecaModal.querySelector('#alerta_estoque_minimo').value = data.alerta_estoque_minimo;
+                    })
+                    .catch(error => console.error('Erro ao carregar dados da peça:', error));
+            }
+        });
+    });
+</script>
+{% endblock %}

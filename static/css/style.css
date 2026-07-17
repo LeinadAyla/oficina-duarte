@@ -1,0 +1,80 @@
+body {
+    background-color: lightblue; /* Nova cor de fundo */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.card {
+    border-radius: 1rem; /* Novo border-radius */
+    box-shadow: 0 4px 12px rgba(0,0,0,.1); /* Nova sombra */
+}
+
+.card-header.bg-primary {
+    background-color: #007bff !important;
+}
+
+.card-header.bg-success {
+    background-color: #28a745 !important;
+}
+
+.card-header.bg-info {
+    background-color: #17a2b8 !important;
+}
+
+.modal-header.bg-primary {
+    background-color: #007bff !important;
+}
+.modal-header.bg-success {
+    background-color: #28a745 !important;
+}
+.modal-header.bg-info {
+    background-color: #17a2b8 !important;
+}
+.modal-header.bg-danger {
+    background-color: #dc3545 !important;
+}
+
+.btn-close-white {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+.list-group-item {
+    border-color: #e9ecef;
+}
+
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.alert {
+    margin-top: 1rem;
+}
+
+/* Estilo para a seção especial do Duarte */
+.card.border-success {
+    border-width: 2px !important;
+}
+.card-title.text-success {
+    font-weight: 700;
+}
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+.btn-success:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+/* Ícone do WhatsApp, pode precisar de Font Awesome */
+.fa-whatsapp::before {
+    content: "\f232";
+    font-family: 'Font Awesome 5 Brands'; /* Certifique-se de incluir Font Awesome no base.html se quiser o ícone */
+    margin-right: 0.5rem;
+}
+/* Incluir Font Awesome no base.html:
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+*/

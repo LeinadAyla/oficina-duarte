@@ -1,0 +1,15 @@
+
+# 2026-07-16 20:41:29.089354
++/drop app.py models.py forms.py routes.py
+
+# 2026-07-16 20:41:39.648927
++/add templates/clientes.html
+
+# 2026-07-16 20:42:34.391255
++N
+
+# 2026-07-16 20:42:52.793402
++/add clientes.html
+
+# 2026-07-16 20:44:06.758883
++Adicione um script simples com Vanilla JavaScript (ou funções auxiliares) no final do arquivo clientes.html para aplicar máscaras de formatação automática nos campos de entrada de CPF (formato 000.000.000-00) e Celular (formato (00) 00000-0000). Certifique-se de que funcione tanto para os modais de criação quanto de edição.
