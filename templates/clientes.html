@@ -2,6 +2,7 @@
 
 {% block content %}
 <div class="container-fluid mt-4">
+
     <div class="row mb-4">
         <div class="col d-flex justify-content-between align-items-center">
             <h2><i class="fas fa-users text-primary me-2"></i>Gerenciamento de Clientes</h2>
@@ -193,9 +194,69 @@
 </div>
 
 <!-- ==========================================
-             CONTROLE VIA JAVASCRIPT
+              CONTROLE VIA JAVASCRIPT
 ========================================== -->
 <script>
+// Funções auxiliares de máscara de entrada
+function mCPF(cpf) {
+    cpf = cpf.replace(/\D/g, "");                    // Remove tudo o que não é dígito
+    cpf = cpf.replace(/(\d{3})(\d)/, "$1.$2");       // Coloca ponto após o 3º dígito
+    cpf = cpf.replace(/(\d{3})(\d)/, "$1.$2");       // Coloca ponto após o 6º dígito
+    cpf = cpf.replace(/(\d{3})(\d{1,2})$/, "$1-$2"); // Coloca hífen após o 9º dígito
+    return cpf.substring(0, 14);                     // Limita em 14 caracteres
+}
+
+function mCelular(tel) {
+    tel = tel.replace(/\D/g, "");                    // Remove tudo o que não é dígito
+    tel = tel.replace(/^(\d{2})(\d)/g, "($1) $2");    // Coloca parênteses no DDD
+    tel = tel.replace(/(\d{5})(\d)/, "$1-$2");       // Coloca hífen após o 5º dígito do número
+    return tel.substring(0, 15);                     // Limita em 15 caracteres
+}
+
+// Aplica escuta de digitação aos campos corretos
+function aplicarMascaras() {
+    // Seleciona pelos IDs gerados e os inputs de Novo Cliente
+    const cpfInputs = document.querySelectorAll('input[id*="cpf"], input[name*="cpf"]');
+    const telInputs = document.querySelectorAll('input[id*="celular"], input[name*="celular"]');
+
+    cpfInputs.forEach(input => {
+        // Formata o valor inicial (útil para quando carrega o Editar Cliente)
+        input.value = mCPF(input.value);
+        input.addEventListener('input', e => {
+            e.target.value = mCPF(e.target.value);
+        });
+    });
+
+    telInputs.forEach(input => {
+        // Formata o valor inicial
+        input.value = mCelular(input.value);
+        input.addEventListener('input', e => {
+            e.target.value = mCelular(e.target.value);
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializa nos inputs que já estão no HTML (como o de Novo Cliente)
+    aplicarMascaras();
+
+    // Se a URL pedir para abrir o modal de novo cliente, abre automaticamente
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('abrirModal') === 'true') {
+        var modalEl = document.getElementById('modalNovoCliente');
+        if (modalEl) {
+            new bootstrap.Modal(modalEl).show();
+        }
+
+        // Remove o parâmetro para não reabrir ao dar F5
+        params.delete('abrirModal');
+        var newQuery = params.toString();
+        var newUrl = window.location.pathname + (newQuery ? ('?' + newQuery) : '') + window.location.hash;
+        window.history.replaceState({}, '', newUrl);
+    }
+});
+
+
 // Preparar modal de Edição de Cliente carregando dados via API interna
 function prepararEditarCliente(clienteId) {
     fetch(`/api/cliente/${clienteId}`)
@@ -209,6 +270,9 @@ function prepararEditarCliente(clienteId) {
             // Define o action correto do form com a rota de edição
             document.getElementById('formEditarCliente').action = `/cliente/editar/${clienteId}`;
             
+            // Força a aplicação das máscaras logo após injetar os valores no form de edição
+            aplicarMascaras();
+
             // Abre o modal
             const modal = new bootstrap.Modal(document.getElementById('modalEditarCliente'));
             modal.show();
