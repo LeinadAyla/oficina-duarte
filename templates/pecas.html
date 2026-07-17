@@ -66,6 +66,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="POST" action="{{ url_for('nova_peca') }}" id="pecaForm">
+                {{ peca_form.csrf_token }}
                 <input type="hidden" name="id" id="peca_id_field">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title" id="pecaModalLabel">Nova Peça</h5>

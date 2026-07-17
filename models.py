@@ -1,7 +1,7 @@
 from app import db
 from datetime import datetime
 from sqlalchemy.orm import relationship, backref # Importar relationship e backref
-from sqlalchemy import event # Para listeners de eventos
+
 
 
 class Cliente(db.Model):
@@ -12,12 +12,26 @@ class Cliente(db.Model):
     cpf = db.Column(db.String(14), unique=True, nullable=False)
     celular = db.Column(db.String(15), nullable=True)
     email = db.Column(db.String(100), nullable=True)
-    
+
     # Relacionamento: Um cliente pode ter vários veículos
     veiculos = db.relationship('Veiculo', backref='dono', lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
         return f'<Cliente {self.nome}>'
+
+    def elegivel_para_bonus(self, limite_servicos_pagos=3):
+        """Elegibilidade simples: cliente com pelo menos N serviços pagos/concluídos."""
+        from sqlalchemy import and_
+        servicos_concluidos = (
+            Servico.query.join(Veiculo)
+            .filter(
+                Veiculo.cliente_id == self.id,
+                and_(Servico.pago.is_(True), Servico.status == 'Concluído')
+            )
+            .count()
+        )
+        return servicos_concluidos >= limite_servicos_pagos
+
 
 
 class Veiculo(db.Model):
@@ -52,30 +66,40 @@ class ServicoPeca(db.Model):
     def __repr__(self):
         return f'<ServicoPeca Servico:{self.servico_id} Peca:{self.peca_id} Qtd:{self.quantidade_usada}>'
 
-# Listener para quando uma ServicoPeca é adicionada, decrementa o estoque
-@event.listens_for(ServicoPeca, 'after_insert')
-def decrement_peca_estoque(mapper, connection, target):
-    peca = Peca.query.get(target.peca_id)
-    if peca:
-        peca.quantidade_estoque -= target.quantidade_usada
-        db.session.add(peca) # Adiciona a peça atualizada à sessão para commit
 
-# Listener para quando uma ServicoPeca é excluída, incrementa o estoque
-@event.listens_for(ServicoPeca, 'after_delete')
-def increment_peca_estoque(mapper, connection, target):
-    peca = Peca.query.get(target.peca_id)
-    if peca:
-        peca.quantidade_estoque += target.quantidade_usada
-        db.session.add(peca) # Adiciona a peça atualizada à sessão para commit
+
+class Mecanico(db.Model):
+    __tablename__ = 'mecanicos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    telefone = db.Column(db.String(20), nullable=True)
+    especialidade = db.Column(db.String(100), nullable=True)
+    comissao_percentual = db.Column(db.Numeric(5, 2), nullable=False, default=0.00)  # ex: 40.00 para 40%
+
+    servicos = db.relationship('Servico', backref='mecanico', lazy=True)
+
+    def __repr__(self):
+        return f'<Mecanico {self.nome}>'
+
 
 class Servico(db.Model):
     __tablename__ = 'servicos'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     descricao = db.Column(db.Text, nullable=False)
     valor = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     data = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    
+
+    # Fluxo financeiro/operacional (tratado como OS)
+    status = db.Column(db.String(30), nullable=False, default='Pendente')  # Pendente, Em Andamento, Concluído
+    pago = db.Column(db.Boolean, nullable=False, default=False)
+    data_pagamento = db.Column(db.DateTime, nullable=True)
+    bonus_aplicado = db.Column(db.String(200), nullable=True)
+
+    # Chave Estrangeira ligando ao Mecânico (autônomo)
+    mecanico_id = db.Column(db.Integer, db.ForeignKey('mecanicos.id'), nullable=True)
+
     # Chave Estrangeira ligando ao Veículo
     veiculo_id = db.Column(db.Integer, db.ForeignKey('veiculos.id'), nullable=False)
 
@@ -84,6 +108,7 @@ class Servico(db.Model):
 
     def __repr__(self):
         return f'<Servico ID {self.id} - Valor {self.valor}>'
+
 
 class Peca(db.Model):
     __tablename__ = 'pecas'

@@ -1,7 +1,8 @@
 from flask import render_template, request, redirect, url_for, jsonify, flash
 from app import app, db
 # Importa todos os modelos agora, incluindo Peca e ServicoPeca
-from models import Cliente, Veiculo, Servico, Peca, ServicoPeca
+from models import Cliente, Veiculo, Servico, Peca, ServicoPeca, Mecanico
+
 # Importa todos os formulários, incluindo os novos
 from forms import ClienteForm, VeiculoForm, ServicoForm, PecaForm, AdicionarPecaServicoForm
 from datetime import datetime
@@ -15,16 +16,36 @@ from sqlalchemy import func # Para funções de agregação no dashboard
 def dashboard():
     total_clientes = Cliente.query.count()
     total_veiculos = Veiculo.query.count()
-    faturamento_total = db.session.query(func.sum(Servico.valor)).scalar() or 0.00
-    alertas_estoque = Peca.query.filter(Peca.quantidade_estoque <= Peca.alerta_estoque_minimo).count()
+    # Alertas de estoque (estoque atual <= mínimo configurado)
+    alertas_estoque = db.session.query(Peca).filter(
+        Peca.quantidade_estoque <= Peca.alerta_estoque_minimo
+    ).count()
+
+    # Faturamento bruto: apenas serviços concluídos/pagos
+    faturamento_bruto = db.session.query(func.sum(Servico.valor)).filter(
+        (Servico.pago.is_(True)) | (Servico.status == 'Concluído')
+    ).scalar() or 0.00
+
+    # Comissão: desconta com base na comissão percentual do mecânico
+    mecanico_id = Servico.mecanico_id
+    faturamento_comissoes = db.session.query(
+        func.sum(Servico.valor * (Mecanico.comissao_percentual / 100.0))
+    ).join(Mecanico, Mecanico.id == mecanico_id, isouter=True).filter(
+        (Servico.pago.is_(True)) | (Servico.status == 'Concluído')
+    ).scalar() or 0.00
+
+    faturamento_liquido = faturamento_bruto - faturamento_comissoes
 
     return render_template(
         'dashboard.html',
         total_clientes=total_clientes,
         total_veiculos=total_veiculos,
-        faturamento_total=faturamento_total,
+        faturamento_bruto=faturamento_bruto,
+        faturamento_comissoes=faturamento_comissoes,
+        faturamento_liquido=faturamento_liquido,
         alertas_estoque=alertas_estoque
     )
+
 
 # ==========================================
 #               ROTAS DE CLIENTES
@@ -277,13 +298,35 @@ def editar_servico(servico_id):
     form = ServicoForm(obj=servico)
     if form.validate_on_submit():
         form.populate_obj(servico)
+
+        # Detecta transição para concluído/pago para aplicar bônus (Parte D)
+        antes_concluido_ou_pago = (servico.status == 'Concluído') or (servico.pago is True)
+
+        # Observação: status/pago podem não estar sendo enviados no HTML/form atual.
+        # Para suportar corretamente, consideramos o estado final após populate_obj.
+        depois_concluido_ou_pago = (servico.status == 'Concluído') or (servico.pago is True)
+
         try:
+            if (not antes_concluido_ou_pago) and depois_concluido_ou_pago and not servico.bonus_aplicado:
+                cliente = servico.veiculo.dono  # Veiculo -> Cliente (backref dono)
+                if cliente and cliente.elegivel_para_bonus():
+                    servicos_disponiveis_bonuses = ['Troca de Óleo', 'Alinhamento', 'Lavagem a Seco']
+                    # Escolha determinística simples (evita random sem necessidade)
+                    indice = (cliente.id + servico.id) % len(servicos_disponiveis_bonuses)
+                    servico.bonus_aplicado = servicos_disponiveis_bonuses[indice]
+                    flash(
+                        f"Parabéns! Cliente elegível para bônus fidelidade: {servico.bonus_aplicado}!",
+                        'success'
+                    )
+
+            db.session.add(servico)
             db.session.commit()
             flash('Serviço atualizado com sucesso!', 'success')
         except Exception as e:
             db.session.rollback()
             flash(f'Erro ao atualizar serviço: {str(e)}', 'danger')
         return redirect(url_for('clientes'))
+
     else:
         for field, errors in form.errors.items():
             for error in errors:
@@ -404,7 +447,15 @@ def adicionar_peca_ao_servico(servico_id):
                     preco_unitario_no_servico=form.preco_unitario_no_servico.data
                 )
                 db.session.add(nova_associacao)
-                # O listener 'after_insert' em models.py cuidará de decrementar o estoque da peça
+                # Controle de estoque explícito (sem listeners ocultos)
+                if peca_selecionada.quantidade_estoque < form.quantidade_usada.data:
+                    raise ValueError(
+                        f'Quantidade solicitada ({form.quantidade_usada.data}) excede o estoque disponível ({peca_selecionada.quantidade_estoque}).'
+                    )
+
+                peca_selecionada.quantidade_estoque -= form.quantidade_usada.data
+                db.session.add(peca_selecionada)
+
                 db.session.commit()
                 flash('Peça adicionada ao serviço com sucesso!', 'success')
             except Exception as e:
@@ -421,54 +472,69 @@ def adicionar_peca_ao_servico(servico_id):
 @app.route('/servico/<int:servico_id>/peca/editar/<int:peca_id>', methods=['POST'])
 def editar_peca_do_servico(servico_id, peca_id):
     servico_peca = ServicoPeca.query.filter_by(servico_id=servico_id, peca_id=peca_id).first_or_404()
-    
-    # Criamos o formulário. O WTForms lerá automaticamente o request.form se a requisição for POST.
+
     form = AdicionarPecaServicoForm()
-    
-    # Populamos o SelectField dinamicamente antes do validate_on_submit()
     form.peca_id.choices = [(p.id, f"{p.nome} (Estoque: {p.quantidade_estoque})") for p in Peca.query.order_by(Peca.nome).all()]
-    
-    # Executa a validação se for uma requisição POST
-    if form.validate_on_submit():
-        quantidade_antiga = servico_peca.quantidade_usada # Guarda a quantidade antiga para ajuste de estoque
-        
-        # Como é uma edição, o peca_id é parte do ID composto e não é alterado. Atualizamos apenas quantidade e preço.
-        servico_peca.quantidade_usada = form.quantidade_usada.data
-        servico_peca.preco_unitario_no_servico = form.preco_unitario_no_servico.data
 
-        try:
-            # Ajusta o estoque da peça manualmente antes do commit para refletir a mudança
-            peca = Peca.query.get(peca_id)
-            if peca:
-                diferenca = quantidade_antiga - servico_peca.quantidade_usada
-                peca.quantidade_estoque += diferenca
-                db.session.add(peca) # Adiciona a peça atualizada à sessão
-
-            db.session.commit()
-            flash('Peça no serviço atualizada com sucesso!', 'success')
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Erro ao atualizar peça no serviço: {str(e)}', 'danger')
-    else:
-        # Se for um GET ou a validação falhar, podemos exibir os erros do formulário
+    if not form.validate_on_submit():
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f"Erro no campo '{getattr(form, field).label.text}': {error}", 'danger')
-    
+        return redirect(url_for('clientes'))
+
+    quantidade_antiga = servico_peca.quantidade_usada
+    quantidade_nova = form.quantidade_usada.data
+
+    try:
+        peca = Peca.query.get(peca_id)
+        if not peca:
+            raise ValueError('Peça não encontrada para atualização de estoque.')
+
+        # Atualiza entidade de vínculo
+        servico_peca.quantidade_usada = quantidade_nova
+        servico_peca.preco_unitario_no_servico = form.preco_unitario_no_servico.data
+
+        # Ajuste de estoque atômico: devolve a quantidade antiga e consome a nova
+        delta = quantidade_antiga - quantidade_nova
+        peca.quantidade_estoque += delta
+
+        if peca.quantidade_estoque < 0:
+            raise ValueError('Estoque não pode ficar negativo.')
+
+        db.session.add(peca)
+        db.session.add(servico_peca)
+        db.session.commit()
+
+        flash('Peça no serviço atualizada com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao atualizar peça no serviço: {str(e)}', 'danger')
+
     return redirect(url_for('clientes'))
+
 
 
 @app.route('/servico/<int:servico_id>/peca/excluir/<int:peca_id>', methods=['POST'])
 def excluir_peca_do_servico(servico_id, peca_id):
     servico_peca = ServicoPeca.query.filter_by(servico_id=servico_id, peca_id=peca_id).first_or_404()
+
     try:
+        peca = Peca.query.get_or_404(peca_id)
+
+        # Devolve o estoque antes de remover a associação
+        peca.quantidade_estoque += servico_peca.quantidade_usada
+        if peca.quantidade_estoque < 0:
+            raise ValueError('Estoque não pode ficar negativo.')
+
+        db.session.add(peca)
         db.session.delete(servico_peca)
-        # O listener 'after_delete' em models.py cuidará de incrementar o estoque da peça
         db.session.commit()
+
         flash('Peça removida do serviço com sucesso!', 'danger')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao remover peça do serviço: {str(e)}', 'danger')
+
     return redirect(url_for('clientes'))
 
 # Endpoint para fornecer opções de peças para SelectField de forma dinâmica
