@@ -46,7 +46,6 @@ def dashboard():
         alertas_estoque=alertas_estoque
     )
 
-
 # ==========================================
 #               ROTAS DE CLIENTES
 # ==========================================
@@ -116,15 +115,12 @@ def get_servico(servico_id):
         'data': servico.data.strftime('%Y-%m-%d') if servico.data else '',
         'valor': str(servico.valor),
         'veiculo_id': servico.veiculo_id,
-
         # Campos necessários para o modal de edição
         'status': servico.status,
         'pago': bool(servico.pago),
         'mecanico_id': servico.mecanico_id,
-
         'pecas': pecas_do_servico
     })
-
 
 @app.route('/api/peca/<int:peca_id>', methods=['GET'])
 def get_peca(peca_id):
@@ -174,20 +170,17 @@ def novo_cliente():
             flash(f'Erro ao adicionar cliente: {str(e)}', 'danger')
         return redirect(url_for('clientes'))
     else:
-        # Se a validação falhar, podemos querer retornar ao modal ou exibir erros.
-        # Por simplicidade, vamos redirecionar e flashear os erros.
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f"Erro no campo '{getattr(form, field).label.text}': {error}", 'danger')
         return redirect(url_for('clientes'))
 
-
 @app.route('/cliente/editar/<int:cliente_id>', methods=['POST'])
 def editar_cliente(cliente_id):
     cliente = Cliente.query.get_or_404(cliente_id)
-    form = ClienteForm(obj=cliente) # Popula o formulário com dados do cliente existente
+    form = ClienteForm(obj=cliente)
     if form.validate_on_submit():
-        form.populate_obj(cliente) # Atualiza o objeto cliente com os dados do formulário
+        form.populate_obj(cliente)
         try:
             db.session.commit()
             flash('Cliente atualizado com sucesso!', 'success')
@@ -199,8 +192,7 @@ def editar_cliente(cliente_id):
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f"Erro no campo '{getattr(form, field).label.text}': {error}", 'danger')
-        return redirect(url_for('clientes')) # Redireciona de volta para a lista de clientes
-
+        return redirect(url_for('clientes'))
 
 @app.route('/cliente/excluir/<int:cliente_id>', methods=['POST'])
 def excluir_cliente(cliente_id):
@@ -218,8 +210,6 @@ def excluir_cliente(cliente_id):
 @app.route('/veiculo/novo/<int:cliente_id>', methods=['POST'])
 def novo_veiculo(cliente_id):
     form = VeiculoForm()
-
-    # Mantém as choices no POST (garante consistência da validação)
     if not form.tipo_propagacao.choices:
         form.tipo_propagacao.choices = [
             ('', 'Selecione...'),
@@ -237,8 +227,6 @@ def novo_veiculo(cliente_id):
             tipo_propulsao=form.tipo_propagacao.data,
             cliente_id=cliente_id
         )
-
-
         try:
             db.session.add(novo)
             db.session.commit()
@@ -251,8 +239,7 @@ def novo_veiculo(cliente_id):
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f"Erro no campo '{getattr(form, field).label.text}': {error}", 'danger')
-        return redirect(url_for('clientes')) # Redireciona de volta para a lista de clientes
-
+        return redirect(url_for('clientes'))
 
 @app.route('/veiculo/editar/<int:veiculo_id>', methods=['POST'])
 def editar_veiculo(veiculo_id):
@@ -262,7 +249,6 @@ def editar_veiculo(veiculo_id):
         form.populate_obj(veiculo)
         try:
             db.session.commit()
-
             flash('Veículo atualizado com sucesso!', 'success')
         except Exception as e:
             db.session.rollback()
@@ -272,8 +258,7 @@ def editar_veiculo(veiculo_id):
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f"Erro no campo '{getattr(form, field).label.text}': {error}", 'danger')
-        return redirect(url_for('clientes')) # Redireciona de volta para a lista de clientes
-
+        return redirect(url_for('clientes'))
 
 @app.route('/veiculo/excluir/<int:veiculo_id>', methods=['POST'])
 def excluir_veiculo(veiculo_id):
@@ -288,18 +273,18 @@ def excluir_veiculo(veiculo_id):
     return redirect(url_for('clientes'))
 
 # --- AÇÕES DO SERVIÇO ---
-@app.route('/servico/novo/<int:veiculo_id>', methods=['POST'])
+@app.route('/servico/novo/<int:veiculo_id>', methods=['GET', 'POST'])
 def novo_servico(veiculo_id):
     form = ServicoForm()
-    # Populate mecânicos para Select
     form.mecanico_id.choices = [(-1, 'Nenhum mecânico')] + [
         (m.id, f"{m.nome} ({m.especialidade}) - {m.comissao_percentual}%") for m in Mecanico.query.order_by(Mecanico.nome).all()
     ]
+    if request.method == 'GET':
+        return render_template('novo_servico.html', form=form, veiculo_id=veiculo_id)
 
     if form.validate_on_submit():
         pago_bool = True if form.pago.data == 'true' else False
         mecanico_id = None if form.mecanico_id.data in (None, -1) else form.mecanico_id.data
-
         novo = Servico(
             descricao=form.descricao.data,
             data=form.data.data,
@@ -309,7 +294,6 @@ def novo_servico(veiculo_id):
             mecanico_id=mecanico_id,
             veiculo_id=veiculo_id
         )
-
         try:
             db.session.add(novo)
             db.session.commit()
@@ -324,69 +308,68 @@ def novo_servico(veiculo_id):
                 flash(f"Erro no campo '{getattr(form, field).label.text}': {error}", 'danger')
         return redirect(url_for('clientes'))
 
+@app.route('/servicos')
+def listar_servicos():
+    servicos = Servico.query.order_by(Servico.data.desc()).all()
+    return render_template('servicos.html', servicos=servicos)
 
-@app.route('/servico/editar/<int:servico_id>', methods=['POST'])
+@app.route('/servico/editar/<int:servico_id>', methods=['GET', 'POST'])
 def editar_servico(servico_id):
     servico = Servico.query.get_or_404(servico_id)
+    if request.method == 'GET':
+        form = ServicoForm(obj=servico)
+        form.mecanico_id.choices = [(-1, 'Nenhum mecânico')] + [
+            (m.id, f"{m.nome} ({m.especialidade}) - {m.comissao_percentual}%") for m in Mecanico.query.order_by(Mecanico.nome).all()
+        ]
+        form.status.data = servico.status
+        form.pago.data = 'true' if servico.pago else 'false'
+        if servico.mecanico_id is None:
+            form.mecanico_id.data = -1
+        return render_template('editar_servico.html', form=form, servico_id=servico_id)
+
     form = ServicoForm(obj=servico)
-    # Populate mecânicos para Select
     form.mecanico_id.choices = [(-1, 'Nenhum mecânico')] + [
         (m.id, f"{m.nome} ({m.especialidade}) - {m.comissao_percentual}%") for m in Mecanico.query.order_by(Mecanico.nome).all()
     ]
-
-    # Ajuste dos campos Select (wtforms não popula SelectField bool automaticamente)
     form.status.data = servico.status
     form.pago.data = 'true' if servico.pago else 'false'
     if servico.mecanico_id is None:
         form.mecanico_id.data = -1
-
+        
     if form.validate_on_submit():
         pago_bool = True if form.pago.data == 'true' else False
         mecanico_id = None if form.mecanico_id.data in (None, -1) else form.mecanico_id.data
-
-        # Atualiza campos comuns do model
+        
+        antes_concluido_ou_pago = (servico.status == 'Concluído') or (servico.pago is True)
+        
         servico.descricao = form.descricao.data
         servico.data = form.data.data
         servico.valor = form.valor.data
         servico.status = form.status.data
         servico.pago = pago_bool
         servico.mecanico_id = mecanico_id
-
-
-        # Detecta transição para concluído/pago para aplicar bônus (Parte D)
-        antes_concluido_ou_pago = (servico.status == 'Concluído') or (servico.pago is True)
-
-        # Observação: status/pago podem não estar sendo enviados no HTML/form atual.
-        # Para suportar corretamente, consideramos o estado final após populate_obj.
+        
         depois_concluido_ou_pago = (servico.status == 'Concluído') or (servico.pago is True)
-
         try:
             if (not antes_concluido_ou_pago) and depois_concluido_ou_pago and not servico.bonus_aplicado:
-                cliente = servico.veiculo.dono  # Veiculo -> Cliente (backref dono)
+                cliente = servico.veiculo.dono
                 if cliente and cliente.elegivel_para_bonus():
                     servicos_disponiveis_bonuses = ['Troca de Óleo', 'Alinhamento', 'Lavagem a Seco']
-                    # Escolha determinística simples (evita random sem necessidade)
                     indice = (cliente.id + servico.id) % len(servicos_disponiveis_bonuses)
                     servico.bonus_aplicado = servicos_disponiveis_bonuses[indice]
-                    flash(
-                        f"Parabéns! Cliente elegível para bônus fidelidade: {servico.bonus_aplicado}!",
-                        'success'
-                    )
-
+                    flash(f"Parabéns! Cliente elegível para bônus: {servico.bonus_aplicado}!", 'success')
             db.session.add(servico)
             db.session.commit()
-            flash('Serviço atualizado com sucesso!', 'success')
+            flash('Serviço updated com sucesso!', 'success')
         except Exception as e:
             db.session.rollback()
             flash(f'Erro ao atualizar serviço: {str(e)}', 'danger')
         return redirect(url_for('clientes'))
-
     else:
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f"Erro no campo '{getattr(form, field).label.text}': {error}", 'danger')
         return redirect(url_for('clientes'))
-
 
 @app.route('/servico/excluir/<int:servico_id>', methods=['POST'])
 def excluir_servico(servico_id):
@@ -401,7 +384,7 @@ def excluir_servico(servico_id):
     return redirect(url_for('clientes'))
 
 # ==========================================
-#               ROTAS DE PEÇAS (ESTOQUE)
+#           ROTAS DE PEÇAS (ESTOQUE)
 # ==========================================
 
 @app.route('/pecas')
@@ -468,14 +451,13 @@ def excluir_peca(peca_id):
     return redirect(url_for('pecas'))
 
 # ==========================================
-#               ROTAS DE MECÂNICOS
+#             ROTAS DE MECÂNICOS
 # ==========================================
 
 @app.route('/mecanicos')
 def mecanicos():
     mecanicos_list = Mecanico.query.order_by(Mecanico.nome).all()
     return render_template('mecanicos.html', mecanicos=mecanicos_list)
-
 
 @app.route('/mecanicos/novo', methods=['POST'])
 def novo_mecanico():
@@ -496,7 +478,6 @@ def novo_mecanico():
         especialidade=especialidade,
         comissao_percentual=comissao_percentual,
     )
-
     try:
         db.session.add(novo)
         db.session.commit()
@@ -504,18 +485,14 @@ def novo_mecanico():
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao cadastrar mecânico: {str(e)}', 'danger')
-
     return redirect(url_for('mecanicos'))
-
 
 @app.route('/mecanicos/editar/<int:mecanico_id>', methods=['POST'])
 def editar_mecanico(mecanico_id):
     mecanico = Mecanico.query.get_or_404(mecanico_id)
-
     mecanico.nome = request.form.get('nome', '').strip()
     mecanico.telefone = request.form.get('telefone', '').strip() or None
     mecanico.especialidade = request.form.get('especialidade', '').strip() or None
-
     comissao_percentual_raw = request.form.get('comissao_percentual', '0').strip()
     try:
         mecanico.comissao_percentual = float(comissao_percentual_raw)
@@ -530,9 +507,7 @@ def editar_mecanico(mecanico_id):
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao atualizar mecânico: {str(e)}', 'danger')
-
     return redirect(url_for('mecanicos'))
-
 
 @app.route('/mecanicos/excluir/<int:mecanico_id>', methods=['POST'])
 def excluir_mecanico(mecanico_id):
@@ -547,24 +522,18 @@ def excluir_mecanico(mecanico_id):
     return redirect(url_for('mecanicos'))
 
 # ==========================================
-#          AÇÕES DE PEÇAS EM SERVIÇOS
+#        AÇÕES DE PEÇAS EM SERVIÇOS
 # ==========================================
-
-
 
 @app.route('/veiculo/<int:veiculo_id>/servicos')
 def ver_servicos_do_veiculo(veiculo_id):
     veiculo = Veiculo.query.get_or_404(veiculo_id)
-    # relacionamento já traz servicos do veículo via backref
     return render_template('servicos.html', veiculo=veiculo, servicos=veiculo.servicos)
 
-
 @app.route('/servico/<int:servico_id>/peca/adicionar', methods=['POST'])
-
 def adicionar_peca_ao_servico(servico_id):
     servico = Servico.query.get_or_404(servico_id)
     form = AdicionarPecaServicoForm()
-    # Para o SelectField do formulário, precisamos popular as opções de peças
     form.peca_id.choices = [(p.id, f"{p.nome} (Estoque: {p.quantidade_estoque})") for p in Peca.query.order_by(Peca.nome).all()]
 
     if form.validate_on_submit():
@@ -573,7 +542,6 @@ def adicionar_peca_ao_servico(servico_id):
             flash('Peça não encontrada.', 'danger')
             return redirect(url_for('clientes'))
 
-        # Verifica se a peça já está no serviço
         servico_peca_existente = ServicoPeca.query.filter_by(
             servico_id=servico_id,
             peca_id=form.peca_id.data
@@ -583,6 +551,10 @@ def adicionar_peca_ao_servico(servico_id):
             flash('Esta peça já foi adicionada a este serviço. Edite-a se precisar alterar a quantidade.', 'warning')
         else:
             try:
+                if peca_selecionada.quantidade_estoque < form.quantidade_usada.data:
+                    raise ValueError(
+                        f'Quantidade solicitada ({form.quantidade_usada.data}) excede o estoque disponível ({peca_selecionada.quantidade_estoque}).'
+                    )
                 nova_associacao = ServicoPeca(
                     servico_id=servico_id,
                     peca_id=form.peca_id.data,
@@ -590,15 +562,8 @@ def adicionar_peca_ao_servico(servico_id):
                     preco_unitario_no_servico=form.preco_unitario_no_servico.data
                 )
                 db.session.add(nova_associacao)
-                # Controle de estoque explícito (sem listeners ocultos)
-                if peca_selecionada.quantidade_estoque < form.quantidade_usada.data:
-                    raise ValueError(
-                        f'Quantidade solicitada ({form.quantidade_usada.data}) excede o estoque disponível ({peca_selecionada.quantidade_estoque}).'
-                    )
-
                 peca_selecionada.quantidade_estoque -= form.quantidade_usada.data
                 db.session.add(peca_selecionada)
-
                 db.session.commit()
                 flash('Peça adicionada ao serviço com sucesso!', 'success')
             except Exception as e:
@@ -608,14 +573,11 @@ def adicionar_peca_ao_servico(servico_id):
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f"Erro no campo '{getattr(form, field).label.text}': {error}", 'danger')
-    
-    return redirect(url_for('clientes')) # Sempre redireciona para a página de clientes após a ação
-
+    return redirect(url_for('clientes'))
 
 @app.route('/servico/<int:servico_id>/peca/editar/<int:peca_id>', methods=['POST'])
 def editar_peca_do_servico(servico_id, peca_id):
     servico_peca = ServicoPeca.query.filter_by(servico_id=servico_id, peca_id=peca_id).first_or_404()
-
     form = AdicionarPecaServicoForm()
     form.peca_id.choices = [(p.id, f"{p.nome} (Estoque: {p.quantidade_estoque})") for p in Peca.query.order_by(Peca.nome).all()]
 
@@ -633,11 +595,9 @@ def editar_peca_do_servico(servico_id, peca_id):
         if not peca:
             raise ValueError('Peça não encontrada para atualização de estoque.')
 
-        # Atualiza entidade de vínculo
         servico_peca.quantidade_usada = quantidade_nova
         servico_peca.preco_unitario_no_servico = form.preco_unitario_no_servico.data
 
-        # Ajuste de estoque atômico: devolve a quantidade antiga e consome a nova
         delta = quantidade_antiga - quantidade_nova
         peca.quantidade_estoque += delta
 
@@ -647,24 +607,17 @@ def editar_peca_do_servico(servico_id, peca_id):
         db.session.add(peca)
         db.session.add(servico_peca)
         db.session.commit()
-
         flash('Peça no serviço atualizada com sucesso!', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao atualizar peça no serviço: {str(e)}', 'danger')
-
     return redirect(url_for('clientes'))
-
-
 
 @app.route('/servico/<int:servico_id>/peca/excluir/<int:peca_id>', methods=['POST'])
 def excluir_peca_do_servico(servico_id, peca_id):
     servico_peca = ServicoPeca.query.filter_by(servico_id=servico_id, peca_id=peca_id).first_or_404()
-
     try:
         peca = Peca.query.get_or_404(peca_id)
-
-        # Devolve o estoque antes de remover a associação
         peca.quantidade_estoque += servico_peca.quantidade_usada
         if peca.quantidade_estoque < 0:
             raise ValueError('Estoque não pode ficar negativo.')
@@ -672,12 +625,10 @@ def excluir_peca_do_servico(servico_id, peca_id):
         db.session.add(peca)
         db.session.delete(servico_peca)
         db.session.commit()
-
         flash('Peça removida do serviço com sucesso!', 'danger')
     except Exception as e:
         db.session.rollback()
         flash(f'Erro ao remover peça do serviço: {str(e)}', 'danger')
-
     return redirect(url_for('clientes'))
 
 # Endpoint para fornecer opções de peças para SelectField de forma dinâmica

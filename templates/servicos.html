@@ -1,197 +1,78 @@
 {% extends 'base.html' %}
-{% block title %}Serviços - Oficina Duarte{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-2">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="mb-0"><i class="fas fa-wrench me-2 text-info"></i>Serviços do Veículo</h2>
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-tools me-2 text-primary"></i>Histórico Geral de Serviços</h2>
+        <a href="{{ url_for('clientes') }}" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Gerenciar Clientes</a>
+    </div>
 
-    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#servicoModal" onclick="prepararNovoServico({{ veiculo.id }})">
-      <i class="fas fa-plus me-1"></i> Nova OS
-    </button>
-  </div>
-
-  <div class="card shadow-sm">
-    <div class="card-header bg-light">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <strong>{{ veiculo.marca }} {{ veiculo.modelo }}</strong> ({{ veiculo.placa }})
-          <div class="text-muted small">
-            {{ veiculo.ano if veiculo.ano else 'N/A' }}
-            {% if veiculo.tipo_propagacao %} • {{ veiculo.tipo_propagacao }}{% endif %}
-            {% if veiculo.quilometragem is not none %} • {{ veiculo.quilometragem }} km{% endif %}
-          </div>
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Data</th>
+                        <th>Veículo / Proprietário</th>
+                        <th>Descrição</th>
+                        <th>Mecânico</th>
+                        <th>Valor</th>
+                        <th>Status</th>
+                        <th>Pagamento</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in servicos %}
+                    <tr>
+                        <td>{{ s.data.strftime('%d/%m/%Y') if s.data else '-' }}</td>
+                        <td>
+                            <strong>{{ s.veiculo.modelo }}</strong> <small class="text-muted">({{ s.veiculo.placa }})</small>
+                            <br>
+                            <small class="text-secondary"><i class="fas fa-user me-1"></i>{{ s.veiculo.dono.nome }}</small>
+                        </td>
+                        <td><span class="text-truncate d-inline-block" style="max-width: 250px;">{{ s.descricao }}</span></td>
+                        <td>{{ s.mecanico.nome if s.mecanico else '<span class="text-muted">Não atribuído</span>'|safe }}</td>
+                        <td class="font-weight-bold text-success">R$ {{ "%.2f"|format(s.valor) }}</td>
+                        <td>
+                            {% if s.status == 'Concluído' %}
+                                <span class="badge bg-success">Concluído</span>
+                            {% elif s.status == 'Em Andamento' %}
+                                <span class="badge bg-warning text-dark">Em Andamento</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Pendente</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if s.pago %}
+                                <span class="badge bg-info"><i class="fas fa-check me-1"></i>Pago</span>
+                            {% else %}
+                                <span class="badge bg-danger"><i class="fas fa-clock me-1"></i>Aberto</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('editar_servico', servico_id=s.id) }}" class="btn btn-outline-warning text-dark" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <form action="{{ url_for('excluir_servico', servico_id=s.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja remover esta O.S.?');">
+                                    <button type="submit" class="btn btn-outline-danger" title="Excluir">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            <i class="fas fa-info-circle fa-2x mb-2 d-block"></i> nenhum serviço registrado até o momento.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-      </div>
     </div>
-
-    <div class="card-body p-0">
-      {% if servicos and servicos|length > 0 %}
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Descrição</th>
-              <th>Data</th>
-              <th class="text-end">Valor</th>
-              <th>Status</th>
-              <th>Pago</th>
-              <th>Mecânico</th>
-              <th class="text-end">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for s in servicos|sort(attribute='data', reverse=true) %}
-              <tr>
-                <td>
-                  <strong>{{ s.descricao }}</strong>
-                  <div class="text-muted small">OS #{{ s.id }}</div>
-                </td>
-                <td>{{ s.data.strftime('%d/%m/%Y') if s.data else '-' }}</td>
-                <td class="text-end">R$ {{ "%.2f"|format(s.valor) }}</td>
-                <td>
-                  <span class="badge bg-{{ 'secondary' if s.status=='Pendente' else ('primary' if s.status=='Em Andamento' else 'success') }}">
-                    {{ s.status }}
-                  </span>
-                </td>
-                <td>
-                  {% if s.pago %}
-                    <span class="badge bg-success">Sim</span>
-                  {% else %}
-                    <span class="badge bg-danger">Não</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if s.mecanico %}
-                    {{ s.mecanico.nome }} ({{ s.mecanico.comissao_percentual }}%)
-                  {% else %}
-                    <span class="text-muted">-</span>
-                  {% endif %}
-                </td>
-                <td class="text-end">
-                  <button type="button" class="btn btn-sm btn-outline-info me-2" data-bs-toggle="modal" data-bs-target="#servicoModal" onclick="prepararEditarServico({{ s.id }})">
-                    Editar
-                  </button>
-                  <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-id="{{ s.id }}" data-type="servico" data-nome="Serviço #{{ s.id }}">
-                    Excluir
-                  </button>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-        <div class="p-4 text-muted">Nenhum serviço registrado.</div>
-      {% endif %}
-    </div>
-  </div>
 </div>
-
-<!-- Modal Serviço (Nova / Editar) -->
-<div class="modal fade" id="servicoModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="POST" action="" id="servicoForm">
-        <input type="hidden" id="servico_id_field" name="id" value="">
-        <input type="hidden" id="servico_veiculo_id_field" name="veiculo_id" value="{{ veiculo.id }}">
-
-        <div class="modal-header bg-info text-white">
-          <h5 class="modal-title" id="servicoModalLabel">Nova OS</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Descrição do Serviço</label>
-            <textarea class="form-control" name="descricao" rows="3" required id="servico_descricao"></textarea>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Data</label>
-            <input class="form-control" type="date" name="data" required id="servico_data">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Valor (R$)</label>
-            <input class="form-control" type="number" name="valor" step="0.01" min="0.01" required id="servico_valor">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Status</label>
-            <select class="form-select" name="status" required id="servico_status">
-              <option value="Pendente">Pendente</option>
-              <option value="Em Andamento">Em Andamento</option>
-              <option value="Concluído">Concluído</option>
-            </select>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Pago</label>
-            <select class="form-select" name="pago" required id="servico_pago">
-              <option value="false">Não</option>
-              <option value="true">Sim</option>
-            </select>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Mecânico</label>
-            <select class="form-select" name="mecanico_id" id="servico_mecanico_id">
-              <option value="-1">Nenhum mecânico</option>
-              {# opções preenchidas no submit via backend (routes.py) #}
-            </select>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-          <button type="submit" class="btn btn-info">Salvar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<script>
-  function prepararNovoServico(veiculoId) {
-    document.getElementById('servicoModalLabel').textContent = 'Nova OS';
-    document.getElementById('servico_id_field').value = '';
-    document.getElementById('servicoForm').action = '/servico/novo/' + veiculoId;
-
-
-    // defaults
-    document.getElementById('servico_status').value = 'Pendente';
-    document.getElementById('servico_pago').value = 'false';
-
-    // limpa inputs
-    document.getElementById('servico_descricao').value = '';
-    document.getElementById('servico_data').value = '';
-    document.getElementById('servico_valor').value = '';
-
-    // garante opção vazia
-    document.getElementById('servico_mecanico_id').value = '-1';
-  }
-
-  function prepararEditarServico(servicoId) {
-    document.getElementById('servicoModalLabel').textContent = `Editar OS #${servicoId}`;
-    document.getElementById('servico_id_field').value = servicoId;
-    document.getElementById('servicoForm').action = `/servico/editar/${servicoId}`;
-
-    fetch(`/api/servico/${servicoId}`)
-      .then(r => r.json())
-      .then(data => {
-        document.getElementById('servico_descricao').value = data.descricao || '';
-        document.getElementById('servico_data').value = data.data || '';
-        document.getElementById('servico_valor').value = data.valor || '';
-
-        // status/pago/mecanico_id não são retornados pelo endpoint atual => mantemos o que o backend populou via validação
-        // Aqui apenas evita campos vazios
-        // (ao submeter, routes.py vai preencher choices e usar servico.status/pago existentes para defaults no validate-on-submit)
-      })
-      .catch(() => {
-        alert('Não foi possível carregar os dados da OS.');
-      });
-  }
-</script>
 {% endblock %}
-
