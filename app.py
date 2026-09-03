@@ -19,9 +19,9 @@ migrate = Migrate(app, db)  # Inicializa Flask-Migrate
 @app.context_processor
 def inject_now():
     return {
-        'datetime': datetime.datetime,                  # Permite usar {{ datetime.now().year }}
-        'now': lambda: datetime.datetime.now(),          # Permite usar {{ now().year }} (com parênteses no now)
-        'year_now': datetime.datetime.now().year        # Permite usar o simples {{ year_now }}
+        'datetime': datetime,                  # Permite usar {{ datetime.now().year }}
+        'now': lambda: datetime.now(),          # Permite usar {{ now().year }} (com parênteses no now)
+        'year_now': datetime.now().year        # Permite usar o simples {{ year_now }}
     }
 
 # Importa as rotas para o Flask reconhecê-las
