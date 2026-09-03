@@ -2,3 +2,8 @@
 node_modules/
 *.pyc
 __pycache__/
+.aider.tags.cache.v4/
+instance/
+static/src/*.js
+static/src/*.js.map
+static/src/*.d.ts.map
