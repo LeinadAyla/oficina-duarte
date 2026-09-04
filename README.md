@@ -1,5 +1,11 @@
 # Sistema de Gestão para Oficina de Veículos
-
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Bootstrap](https://img.shields.io/badge/Bootstrap-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
 Este projeto implementa um sistema web completo para gestão de clientes, veículos e serviços de uma oficina, utilizando Flask, SQLite e TypeScript.
 
 ## Funcionalidades
@@ -149,5 +155,5 @@ A aplicação estará disponível em `http://127.0.0.1:5000/` (ou outra porta in
 7.  A seção especial "Duarte" na página inicial permite um contato direto via WhatsApp.
 
 ---
-Desenvolvido por [Seu Nome]
+Desenvolvido por [Wilson Freitas]
 Data: 2026-07-16
